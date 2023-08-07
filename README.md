@@ -1,2 +1,2 @@
-# sgm_gpu
-gpu version of sgm algorithm for stereo matching
+# sgm
+cpu&gpu version of sgm algorithm for stereo matching
