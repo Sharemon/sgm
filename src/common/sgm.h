@@ -8,7 +8,7 @@
 #if !defined(__SGM_H__)
 #define __SGM_H__
 
-#include "sgm_define.h"
+#include "./common/sgm_define.h"
 
 namespace sgm
 {
@@ -21,12 +21,10 @@ namespace sgm
         int32_t _P1;
         int32_t _P2;
 
-        bool _apply_postprocess;
-
     public:
-        SGM(int32_t width, int32_t height, int32_t P1, int32_t P2, bool psotprocess = true): 
+        SGM(int32_t width, int32_t height, int32_t P1, int32_t P2): 
             _width(width), _height(height), 
-            _P1(P1), _P2(P2), _apply_postprocess(psotprocess){};
+            _P1(P1), _P2(P2){};
         ~SGM(){};
 
         virtual void calculate_disparity(uint8_t *left, uint8_t* right, float *disparity) = 0;
