@@ -12,7 +12,6 @@
 #include <string.h>
 #include <algorithm>
 
-
 /// @brief 构造函数
 /// @param width 图像宽度
 /// @param height 图像高度
@@ -44,22 +43,20 @@ void sgm::SGM_CPU::calculate_disparity(uint8_t* left, uint8_t* right, float* dis
     census_match(_census_map_left, _census_map_right, _width, _height, _cost_map_initial, DISPARITY_MAX);
 
     // 3. 
-    // cost_aggregation(_cost_map_initial, left, _width, _height, DISPARITY_MAX, 
-    //                 _cost_map_aggregated, _P1, _P2, _cost_map_scanline_buffer, SCAN_LINE_PATH);
-    memcpy(_cost_map_aggregated, _cost_map_initial, _width * _height * DISPARITY_MAX * sizeof(uint16_t));
+    cost_aggregation(_cost_map_initial, left, _width, _height, DISPARITY_MAX, 
+                     _cost_map_aggregated, _P1, _P2, _cost_map_scanline_buffer, SCAN_LINE_PATH);
 
     // 4. 
     WTA(_cost_map_aggregated, _disparity_corse, _width, _height, DISPARITY_MAX);
 
     // 5. 
-    LR_check(_cost_map_aggregated, _disparity_corse, _cost_map_aggregated, _disparity_corse_right, _width, _height, DISPARITY_MAX);
+    LR_check(_cost_map_aggregated, _disparity_corse, _cost_map_right, _disparity_corse_right, _width, _height, DISPARITY_MAX);
 
     // 6. 
     refine(_cost_map_aggregated, _disparity_corse, _disparity_refined, _width, _height, DISPARITY_MAX);
 
     // 7.
-    //median_filter(_disparity_refined, disparity, _width, _height, MEDIAN_FILTER_SIZE);
-    memcpy(disparity, _disparity_refined, _width * _height * sizeof(float));
+    median_filter(_disparity_refined, disparity, _width, _height, MEDIAN_FILTER_SIZE);
 }
 
 

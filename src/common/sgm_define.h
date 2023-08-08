@@ -13,8 +13,8 @@
 // sgm algorithm parameter
 #define IMAGE_WIDTH_MAX         (1280)
 #define IMAGE_HEIGHT_MAX        (720)
-#define DISPARITY_MAX           (128)
-#define SCAN_LINE_PATH          (4)
+#define DISPARITY_MAX           (64)
+#define SCAN_LINE_PATH          (8)
 #define CENSUS_WINDOW_WIDTH     (5)
 #define CENSUS_WINDOW_HEIGHT    (5)
 #define MEDIAN_FILTER_SIZE      (3)

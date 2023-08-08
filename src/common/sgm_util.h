@@ -24,7 +24,7 @@ namespace sgm
     /// @param cost_map 代价map
     void census_match   (const uint32_t *census_map_left, const uint32_t *census_map_right, 
                         int32_t width, int32_t height, 
-                        uint16_t *cost_map, int max_dispairy);
+                        uint16_t *cost_map, int32_t max_dispairy);
 
     /// @brief 扫描线代价聚合
     /// @param cost_map 聚合前的代价map
