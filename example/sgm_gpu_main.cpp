@@ -41,8 +41,6 @@ int main(int argc, char **argv)
     cv::resize(left_image, left_image, cv::Size(new_img_cols, new_img_rows));
     cv::resize(right_image, right_image, cv::Size(new_img_cols, new_img_rows));
 
-    std::cout << left_image.cols << ", " << left_image.rows << std::endl;
-
     sgm::SGM_GPU sgm(left_image.cols, left_image.rows, 10, 150);
 
     cv::Mat disparity = cv::Mat::zeros(left_image.rows, left_image.cols, CV_32FC1);
@@ -50,7 +48,7 @@ int main(int argc, char **argv)
     double t0 = cpu_time_get();
     sgm.calculate_disparity(left_image.data, right_image.data, (float *)disparity.data);
     double t1 = cpu_time_get();
-    std::cout << "sgm cpu time used " << t1 - t0 << "s" << std::endl;
+    std::cout << "sgm gpu time used " << t1 - t0 << "s" << std::endl;
 
     cv::Mat disparity_show;
     disparity.convertTo(disparity_show, CV_8UC1, 4);

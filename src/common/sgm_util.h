@@ -12,6 +12,10 @@
 
 namespace sgm
 {
+    /// @brief 获取当前系统时间(单位:s)
+    /// @return 当前系统时间
+    double cpu_time_get();
+
     /// @brief 计算census
     /// @param img 输入图像
     /// @param census_map 输出census map

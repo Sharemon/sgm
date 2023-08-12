@@ -11,6 +11,18 @@
 #include <iostream>
 #include <string.h>
 #include <assert.h>
+#include <sys/time.h>
+
+/// @brief 获取当前系统时间
+/// @return 当前系统时间
+double sgm::cpu_time_get()
+{
+    struct timeval t;
+    gettimeofday(&t, NULL);
+
+    return ((double)t.tv_sec + t.tv_usec / 1000000.0);
+}
+
 
 /// @brief 计算图像坐标(x,y)上的census值
 /// @param img 图像输入
@@ -788,7 +800,7 @@ void sgm::cost_aggregation(const uint16_t *cost_map, const uint8_t *img,
     cost_aggregation_up2down(cost_map, img, width, height, max_disparity, cost_scanline[2], P1, P2);
     cost_aggregation_down2up(cost_map, img, width, height, max_disparity, cost_scanline[3], P1, P2);
 
-    //if (scanline_path == 8)
+    if (scanline_path == 8)
     {
         cost_aggregation_leftup2rightdown(cost_map, img, width, height, max_disparity, cost_scanline[4], P1, P2);
         cost_aggregation_rightdown2leftup(cost_map, img, width, height, max_disparity, cost_scanline[5], P1, P2);
@@ -859,7 +871,6 @@ void sgm::LR_check(const uint16_t *cost_map, uint16_t *disparity,
                    uint16_t *cost_map_r, uint16_t *disparity_r,
                    int32_t width, int32_t height, int32_t max_disparity)
 {
-
     // 右图代价空间构建
     for (int32_t y = 0; y < height; y++)
     {
@@ -867,7 +878,7 @@ void sgm::LR_check(const uint16_t *cost_map, uint16_t *disparity,
         {
             for (int32_t d = 0; d < max_disparity; d++)
             {
-                cost_map_r[(y * width + x) * max_disparity + d] = cost_map[(y * width + x + d) * max_disparity + d];
+                cost_map_r[(y * width + x) * max_disparity + d] = x + d < width ? cost_map[(y * width + x + d) * max_disparity + d] : UINT8_MAX;
             }
         }
     }

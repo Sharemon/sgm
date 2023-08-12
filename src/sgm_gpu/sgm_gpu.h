@@ -15,8 +15,19 @@ namespace sgm
     class SGM_GPU: public SGM
     {
         private:
-            uint8_t  *_img_left;
-            uint8_t  *_img_right;
+            uint8_t  *_img_left_device;
+            uint8_t  *_img_right_device;
+            uint32_t *_census_map_left_device;
+            uint32_t *_census_map_right_device;
+            uint16_t *_cost_map_initial_device;
+            uint16_t *_cost_map_right_device;
+            uint16_t *_cost_map_scanline_buffer_device;
+            uint16_t *_cost_map_aggregated_device;
+            uint16_t *_disparity_corse_device;
+            uint16_t *_disparity_corse_right_device;
+            float *_disparity_refined_device;
+            float *_disparity_filtered_device;
+            
             uint32_t *_census_map_left;
             uint32_t *_census_map_right;
             uint16_t *_cost_map_initial;
