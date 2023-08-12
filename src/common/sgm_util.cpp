@@ -8,6 +8,7 @@
 #include "./common/sgm_util.h"
 #include <vector>
 #include <algorithm>
+#include <iostream>
 #include <string.h>
 #include <assert.h>
 

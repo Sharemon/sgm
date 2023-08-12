@@ -66,10 +66,10 @@ void sgm::SGM_CPU::initial_memory_space()
     _census_map_left = (uint32_t *)malloc(_width * _height * sizeof(uint32_t));
     _census_map_right = (uint32_t *)malloc(_width * _height * sizeof(uint32_t));
 
-    _cost_map_initial = (uint16_t *)malloc(_width * _height * DISPARITY_MAX * sizeof(uint32_t));
-    _cost_map_right = (uint16_t *)malloc(_width * _height * DISPARITY_MAX * sizeof(uint32_t));
-    _cost_map_scanline_buffer = (uint16_t *)malloc(SCAN_LINE_PATH * _width * _height * DISPARITY_MAX * sizeof(uint32_t));
-    _cost_map_aggregated = (uint16_t *)malloc(_width * _height * DISPARITY_MAX * sizeof(uint32_t));
+    _cost_map_initial = (uint16_t *)malloc(_width * _height * DISPARITY_MAX * sizeof(uint16_t));
+    _cost_map_right = (uint16_t *)malloc(_width * _height * DISPARITY_MAX * sizeof(uint16_t));
+    _cost_map_scanline_buffer = (uint16_t *)malloc(SCAN_LINE_PATH * _width * _height * DISPARITY_MAX * sizeof(uint16_t));
+    _cost_map_aggregated = (uint16_t *)malloc(_width * _height * DISPARITY_MAX * sizeof(uint16_t));
     
     _disparity_corse = (uint16_t *)malloc(_width * _height * sizeof(uint16_t));
     _disparity_corse_right = (uint16_t *)malloc(_width * _height * sizeof(uint16_t));
