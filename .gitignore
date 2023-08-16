@@ -1,3 +1,4 @@
 build/*
 dat/disp.png
 .vscode/*
+.vscode
