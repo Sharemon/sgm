@@ -382,13 +382,204 @@ __global__ void cost_accumulation_gpu(uint16_t *cost_scanline, uint16_t *cost_ac
     cost_acc[idx] = (uint16_t)(cost_temp_u32 / SCAN_LINE_PATH);
 }
 
+__inline__ __device__ uint16_t warp_reduce_min(uint16_t val)
+{
+    val = min(val, __shfl_xor_sync(0xffffffff, val, 1));
+    val = min(val, __shfl_xor_sync(0xffffffff, val, 2));
+    val = min(val, __shfl_xor_sync(0xffffffff, val, 4));
+    val = min(val, __shfl_xor_sync(0xffffffff, val, 8));
+    val = min(val, __shfl_xor_sync(0xffffffff, val, 16));
+
+    return val;
+}
+
+__global__ void cost_scanline_vertical_gpu(
+    uint16_t *cost, uint16_t *cost_scanline, uint8_t *img, 
+    int32_t P1, int32_t P2, int32_t height, bool top2bottom)
+{
+    const int32_t width = gridDim.x;
+    const int32_t x = blockIdx.x;
+    const int32_t d = threadIdx.x;
+    const int32_t start = top2bottom ? 0 : height - 1;
+    const int32_t step  = top2bottom ? 1 : -1;
+    int32_t count = 0;
+
+    uint16_t cost_aggr = UINT8_MAX;
+    __shared__ uint16_t cost_last[2+DISPARITY_MAX];
+    uint8_t gray_last = 0;
+    uint8_t gray = 0;
+
+    cost_last[d] = UINT8_MAX;
+    if (d == 0 || d == 1)
+    {
+        cost_last[d+DISPARITY_MAX] = UINT8_MAX;
+    }
+
+    __shared__ uint16_t cost_last_min;
+    __shared__ uint16_t block_reduce_min_buffer[32];
+    const int32_t lane = threadIdx.x % warpSize;
+    const int32_t wid = threadIdx.x / warpSize;
+
+    if (d == 0)
+    {
+        cost_last_min = UINT8_MAX;
+    }
+    __syncthreads();
+
+    int32_t y = start;
+    while(count < height)
+    {
+        gray = img[x + y * width];
+
+        uint16_t l0 = cost[d + DISPARITY_MAX * (x + y * width)];
+        uint16_t l1 = cost_last[d + 1];
+        uint16_t l2 = cost_last[d] + P1;
+        uint16_t l3 = cost_last[d + 2] + P1;
+        uint16_t l4 = cost_last_min + max(P1, P2 / (abs((int32_t)(gray - gray_last)) + 1));
+
+        cost_aggr = l0 + min(min(l1,l2), min(l3, l4)) - cost_last_min;
+        cost_last[d + 1] = cost_aggr;
+        cost_scanline[d + DISPARITY_MAX * (x + y * width)] = cost_aggr;
+
+        __syncthreads();
+
+        // 找cost_last最小值
+        cost_aggr = warp_reduce_min(cost_aggr);
+
+        if (lane == 0)
+        {
+            block_reduce_min_buffer[wid] = cost_aggr;
+        }
+        __syncthreads();
+
+        cost_aggr = (threadIdx.x < blockDim.x / warpSize) ? block_reduce_min_buffer[lane] : UINT16_MAX;
+
+        if (wid == 0)
+        {
+            cost_aggr = warp_reduce_min(cost_aggr);
+        }
+
+        if (threadIdx.x == 0)
+        {
+            cost_last_min = cost_aggr;
+        }
+
+        __syncthreads();
+
+        count ++;
+        y += step;
+        gray_last = gray;
+    }
+}
+
+
+__global__ void cost_scanline_horizontal_gpu(
+    uint16_t *cost, uint16_t *cost_scanline, uint8_t *img, 
+    int32_t P1, int32_t P2, int32_t width, bool left2right)
+{
+    const int32_t y = blockIdx.x;
+    const int32_t d = threadIdx.x;
+    const int32_t start = left2right ? 0 : width - 1;
+    const int32_t step  = left2right ? 1 : -1;
+    int32_t count = 0;
+
+    uint16_t cost_aggr = UINT8_MAX;
+    __shared__ uint16_t cost_last[2+DISPARITY_MAX];
+    uint8_t gray_last = 0;
+    uint8_t gray = 0;
+
+    cost_last[d] = UINT8_MAX;
+    if (d == 0 || d == 1)
+    {
+        cost_last[d+DISPARITY_MAX] = UINT8_MAX;
+    }
+
+    __shared__ uint16_t cost_last_min;
+    __shared__ uint16_t block_reduce_min_buffer[32];
+    const int32_t lane = threadIdx.x % warpSize;
+    const int32_t wid = threadIdx.x / warpSize;
+
+    if (d == 0)
+    {
+        cost_last_min = UINT8_MAX;
+    }
+    __syncthreads();
+
+    int32_t x = start;
+    while(count < width)
+    {
+        gray = img[x + y * width];
+
+        uint16_t l0 = cost[d + DISPARITY_MAX * (x + y * width)];
+        uint16_t l1 = cost_last[d + 1];
+        uint16_t l2 = cost_last[d] + P1;
+        uint16_t l3 = cost_last[d + 2] + P1;
+        uint16_t l4 = cost_last_min + P2 / (abs((int32_t)(gray - gray_last)) + 1);
+
+        cost_aggr = l0 + min(min(l1,l2), min(l3, l4)) - cost_last_min;
+        cost_last[d + 1] = cost_aggr;
+        cost_scanline[d + DISPARITY_MAX * (x + y * width)] = cost_aggr;
+
+        __syncthreads();
+
+        // 找cost_last最小值
+        cost_aggr = warp_reduce_min(cost_aggr);
+
+        if (lane == 0)
+        {
+            block_reduce_min_buffer[wid] = cost_aggr;
+        }
+        __syncthreads();
+
+        cost_aggr = (threadIdx.x < blockDim.x / warpSize) ? block_reduce_min_buffer[lane] : UINT16_MAX;
+
+        if (wid == 0)
+        {
+            cost_aggr = warp_reduce_min(cost_aggr);
+        }
+
+        if (threadIdx.x == 0)
+        {
+            cost_last_min = cost_aggr;
+        }
+
+        __syncthreads();
+
+        count ++;
+        x += step;
+        gray_last = gray;
+    }
+}
+
+
 void cost_aggregation_gpu(  uint16_t *cost_init, uint8_t *img, uint16_t *cost_scanline, 
                             int32_t width, int32_t height, int32_t P1, int32_t P2)
 {
-    cudaMemcpy(cost_scanline, cost_init, width * height * DISPARITY_MAX * sizeof(uint16_t), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(cost_scanline + width * height * DISPARITY_MAX, cost_init, width * height * DISPARITY_MAX * sizeof(uint16_t), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(cost_scanline + width * height * DISPARITY_MAX * 2, cost_init, width * height * DISPARITY_MAX * sizeof(uint16_t), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(cost_scanline + width * height * DISPARITY_MAX * 3, cost_init, width * height * DISPARITY_MAX * sizeof(uint16_t), cudaMemcpyDeviceToDevice);
+    dim3 block(1, 1, 1);
+    dim3 grid(1, 1, 1);
+
+    uint16_t *cost_scanline_array[DISPARITY_MAX];
+    // 目前只支持scan_line = 4
+    cost_scanline_array[0] = cost_scanline;
+    cost_scanline_array[1] = cost_scanline_array[0] + width * height * DISPARITY_MAX;
+    cost_scanline_array[2] = cost_scanline_array[1] + width * height * DISPARITY_MAX;
+    cost_scanline_array[3] = cost_scanline_array[2] + width * height * DISPARITY_MAX;
+
+    // 1. top to bottom
+    block.x = DISPARITY_MAX;
+    block.y = 1;
+    grid.x  = width;
+    grid.y  = 1;
+    cost_scanline_vertical_gpu<<<grid, block>>>(cost_init, cost_scanline_array[0], img, P1, P2, height, true);
+    cost_scanline_vertical_gpu<<<grid, block>>>(cost_init, cost_scanline_array[1], img, P1, P2, height, false);
+
+    // 3. left to right
+    block.x = DISPARITY_MAX;
+    block.y = 1;
+    grid.x  = height;
+    grid.y  = 1;
+    cost_scanline_horizontal_gpu<<<grid, block>>>(cost_init, cost_scanline_array[2], img, P1, P2, width, true);
+    cost_scanline_horizontal_gpu<<<grid, block>>>(cost_init, cost_scanline_array[3], img, P1, P2, width, false);
 }
 
 /// @brief 计算视差
@@ -443,6 +634,7 @@ void sgm::SGM_GPU::calculate_disparity(uint8_t *left, uint8_t *right, float *dis
     // 3.1 cost aggregation
     cost_aggregation_gpu(_cost_map_initial_device, _img_left_device,
                          _cost_map_scanline_buffer_device, _width, _height, _P1, _P2);
+    cudaDeviceSynchronize();
 
     // 3.2 cost accumulation
     block.x = DISPARITY_MAX;
@@ -450,6 +642,7 @@ void sgm::SGM_GPU::calculate_disparity(uint8_t *left, uint8_t *right, float *dis
     grid.x = _width;
     grid.y = _height;
     cost_accumulation_gpu<<<grid,block>>>(_cost_map_scanline_buffer_device, _cost_map_aggregated_device);
+    cudaDeviceSynchronize();
 
     t1 = cpu_time_get();
     std::cout << "cost aggregation time used is " << (t1 - t0) << "s" << std::endl;
@@ -471,7 +664,7 @@ void sgm::SGM_GPU::calculate_disparity(uint8_t *left, uint8_t *right, float *dis
     t0 = cpu_time_get();
 
     // 5.
-    // LR_check(_cost_map_aggregated, _disparity_corse, _cost_map_right, _disparity_corse_right, _width, _height, DISPARITY_MAX);
+    //LR_check(_cost_map_aggregated, _disparity_corse, _cost_map_right, _disparity_corse_right, _width, _height, DISPARITY_MAX);
     block.x = DISPARITY_MAX;
     block.y = 1;
     grid.x = _width;

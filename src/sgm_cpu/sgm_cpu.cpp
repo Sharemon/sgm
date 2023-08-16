@@ -85,7 +85,8 @@ void sgm::SGM_CPU::calculate_disparity(uint8_t* left, uint8_t* right, float* dis
 
     // 7.
     median_filter(_disparity_refined, disparity, _width, _height, MEDIAN_FILTER_SIZE);
-    
+    //memcpy(disparity, _disparity_refined, _width*_height*sizeof(float));
+
     t1 = cpu_time_get();    
     std::cout << "_median_filter time used is " << (t1-t0) << "s" <<std::endl;
 }
