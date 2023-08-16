@@ -27,16 +27,6 @@ namespace sgm
             uint16_t *_disparity_corse_right_device;
             float *_disparity_refined_device;
             float *_disparity_filtered_device;
-            
-            uint32_t *_census_map_left;
-            uint32_t *_census_map_right;
-            uint16_t *_cost_map_initial;
-            uint16_t *_cost_map_right;
-            uint16_t *_cost_map_scanline_buffer;
-            uint16_t *_cost_map_aggregated;
-            uint16_t *_disparity_corse;
-            uint16_t *_disparity_corse_right;
-            float *_disparity_refined;
 
             /// @brief 初始化内部内存空间
             void initial_memory_space();

@@ -36,59 +36,28 @@ sgm::SGM_CPU::~SGM_CPU()
 /// @param disparity 视差结果
 void sgm::SGM_CPU::calculate_disparity(uint8_t* left, uint8_t* right, float* disparity)
 {
-    double t0, t1;
-    t0 = cpu_time_get();    
-    
-    // 1.
+    // 1. 计算census特征
     census_calculate(left, _width, _height, _census_map_left, CENSUS_WINDOW_WIDTH, CENSUS_WINDOW_HEIGHT);
     census_calculate(right, _width, _height, _census_map_right, CENSUS_WINDOW_WIDTH, CENSUS_WINDOW_HEIGHT);
     
-    t1 = cpu_time_get();    
-    std::cout << "census calculation time used is " << (t1-t0) << "s" <<std::endl;
-    t0 = cpu_time_get();    
-
-    // 2. 
+    // 2. 特征匹配
     census_match(_census_map_left, _census_map_right, _width, _height, _cost_map_initial, DISPARITY_MAX);
     
-    t1 = cpu_time_get();    
-    std::cout << "census match time used is " << (t1-t0) << "s" <<std::endl;
-    t0 = cpu_time_get();    
-
-    // 3. 
+    // 3. 代价聚合
     cost_aggregation(_cost_map_initial, left, _width, _height, DISPARITY_MAX, 
                      _cost_map_aggregated, _P1, _P2, _cost_map_scanline_buffer, SCAN_LINE_PATH);
-    
-    t1 = cpu_time_get();    
-    std::cout << "cost aggregation time used is " << (t1-t0) << "s" <<std::endl;
-    t0 = cpu_time_get();    
 
-    // 4. 
+    // 4. 计算视差
     WTA(_cost_map_aggregated, _disparity_corse, _width, _height, DISPARITY_MAX);
 
-    t1 = cpu_time_get();    
-    std::cout << "WTA time used is " << (t1-t0) << "s" <<std::endl;
-    t0 = cpu_time_get();    
-    
-    // 5. 
+    // 5. 左右一致性检查
     LR_check(_cost_map_aggregated, _disparity_corse, _cost_map_right, _disparity_corse_right, _width, _height, DISPARITY_MAX);
 
-    t1 = cpu_time_get();    
-    std::cout << "LR_check time used is " << (t1-t0) << "s" <<std::endl;
-    t0 = cpu_time_get();    
-    
-    // 6. 
+    // 6. 视差优化
     refine(_cost_map_aggregated, _disparity_corse, _disparity_refined, _width, _height, DISPARITY_MAX);
     
-    t1 = cpu_time_get();    
-    std::cout << "refine time used is " << (t1-t0) << "s" <<std::endl;
-    t0 = cpu_time_get();    
-
-    // 7.
+    // 7. 中值滤波
     median_filter(_disparity_refined, disparity, _width, _height, MEDIAN_FILTER_SIZE);
-    //memcpy(disparity, _disparity_refined, _width*_height*sizeof(float));
-
-    t1 = cpu_time_get();    
-    std::cout << "_median_filter time used is " << (t1-t0) << "s" <<std::endl;
 }
 
 

@@ -12,6 +12,7 @@
 
 namespace sgm
 {
+    /// @brief SGM接口
     class SGM
     {
     protected:
