@@ -278,22 +278,25 @@ __global__ void refine_gpu(uint16_t *cost, uint16_t *disparity_int, float *dispa
     int32_t x = threadIdx.x + blockIdx.x * blockDim.x;
     int32_t y = blockIdx.y;
 
-    int32_t d = disparity_int[x + y * width];
-
-    if (d != 0 && d != DISPARITY_MAX - 1)
+    if (x < width)
     {
-        uint16_t c0 = cost[(y * width + x) * DISPARITY_MAX + d];
-        uint16_t c1 = cost[(y * width + x) * DISPARITY_MAX + d - 1];
-        uint16_t c2 = cost[(y * width + x) * DISPARITY_MAX + d + 1];
+        int32_t d = disparity_int[x + y * width];
 
-        float demon = c1 + c2 - 2 * c0;
-        float dsub = demon < 1 ? d : d + (c1 - c2) / demon / 2.0f;
+        if (d != 0 && d != DISPARITY_MAX - 1)
+        {
+            uint16_t c0 = cost[(y * width + x) * DISPARITY_MAX + d];
+            uint16_t c1 = cost[(y * width + x) * DISPARITY_MAX + d - 1];
+            uint16_t c2 = cost[(y * width + x) * DISPARITY_MAX + d + 1];
 
-        disparity_float[x + y * width] = dsub;
-    }
-    else
-    {
-        disparity_float[x + y * width] = d;
+            float demon = c1 + c2 - 2 * c0;
+            float dsub = demon < 1 ? d : d + (c1 - c2) / demon / 2.0f;
+
+            disparity_float[x + y * width] = dsub;
+        }
+        else
+        {
+            disparity_float[x + y * width] = d;
+        }
     }
 }
 
@@ -344,6 +347,50 @@ __global__ void median_filter3x3_gpu(float *in, float *out, int32_t width, int32
     }
 }
 
+__global__ void cost_accumulation_gpu(uint16_t *cost_scanline, uint16_t *cost_acc)
+{
+    int32_t d = threadIdx.x;
+    int32_t x = blockIdx.x;
+    int32_t y = blockIdx.y;
+    int32_t width = gridDim.x;
+    int32_t height = gridDim.y;
+
+    uint16_t *cost_scanline_array[SCAN_LINE_PATH];
+    cost_scanline_array[0] = cost_scanline;
+    cost_scanline_array[1] = cost_scanline_array[0] + width * height * DISPARITY_MAX;
+    cost_scanline_array[2] = cost_scanline_array[1] + width * height * DISPARITY_MAX;
+    cost_scanline_array[3] = cost_scanline_array[2] + width * height * DISPARITY_MAX;
+#if SCAN_LINE_PATH == 8
+    cost_scanline_array[4] = cost_scanline_array[3] + width * height * DISPARITY_MAX;
+    cost_scanline_array[5] = cost_scanline_array[4] + width * height * DISPARITY_MAX;
+    cost_scanline_array[6] = cost_scanline_array[5] + width * height * DISPARITY_MAX;
+    cost_scanline_array[7] = cost_scanline_array[6] + width * height * DISPARITY_MAX;
+#endif
+
+    int32_t idx = (x + y * width) * DISPARITY_MAX + d;
+    uint32_t cost_temp_u32 =    (uint32_t)cost_scanline_array[0][idx] + 
+                                (uint32_t)cost_scanline_array[1][idx] + 
+                                (uint32_t)cost_scanline_array[2][idx] + 
+                                (uint32_t)cost_scanline_array[3][idx];
+#if SCAN_LINE_PATH == 8
+    cost_temp_u32+=((uint32_t)cost_scanline_array[4][idx] +
+                    (uint32_t)cost_scanline_array[5][idx] +
+                    (uint32_t)cost_scanline_array[6][idx] +
+                    (uint32_t)cost_scanline_array[7][idx]); 
+#endif
+
+    cost_acc[idx] = (uint16_t)(cost_temp_u32 / SCAN_LINE_PATH);
+}
+
+void cost_aggregation_gpu(  uint16_t *cost_init, uint8_t *img, uint16_t *cost_scanline, 
+                            int32_t width, int32_t height, int32_t P1, int32_t P2)
+{
+    cudaMemcpy(cost_scanline, cost_init, width * height * DISPARITY_MAX * sizeof(uint16_t), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(cost_scanline + width * height * DISPARITY_MAX, cost_init, width * height * DISPARITY_MAX * sizeof(uint16_t), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(cost_scanline + width * height * DISPARITY_MAX * 2, cost_init, width * height * DISPARITY_MAX * sizeof(uint16_t), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(cost_scanline + width * height * DISPARITY_MAX * 3, cost_init, width * height * DISPARITY_MAX * sizeof(uint16_t), cudaMemcpyDeviceToDevice);
+}
+
 /// @brief 计算视差
 /// @param left 左图
 /// @param right 右图
@@ -388,20 +435,24 @@ void sgm::SGM_GPU::calculate_disparity(uint8_t *left, uint8_t *right, float *dis
     t1 = cpu_time_get();
     std::cout << "census match time used is " << (t1 - t0) << "s" << std::endl;
 
-    cudaMemcpy(_cost_map_initial, _cost_map_initial_device,
-               _width * _height * DISPARITY_MAX * sizeof(uint16_t), cudaMemcpyDeviceToHost);
-
     t0 = cpu_time_get();
 
     // 3.
-    cost_aggregation(_cost_map_initial, left, _width, _height, DISPARITY_MAX,
-                     _cost_map_aggregated, _P1, _P2, _cost_map_scanline_buffer, SCAN_LINE_PATH);
+    // cost_aggregation(_cost_map_initial, left, _width, _height, DISPARITY_MAX,
+    //                  _cost_map_aggregated, _P1, _P2, _cost_map_scanline_buffer, SCAN_LINE_PATH);
+    // 3.1 cost aggregation
+    cost_aggregation_gpu(_cost_map_initial_device, _img_left_device,
+                         _cost_map_scanline_buffer_device, _width, _height, _P1, _P2);
+
+    // 3.2 cost accumulation
+    block.x = DISPARITY_MAX;
+    block.y = 1;
+    grid.x = _width;
+    grid.y = _height;
+    cost_accumulation_gpu<<<grid,block>>>(_cost_map_scanline_buffer_device, _cost_map_aggregated_device);
 
     t1 = cpu_time_get();
     std::cout << "cost aggregation time used is " << (t1 - t0) << "s" << std::endl;
-
-    cudaMemcpy(_cost_map_aggregated_device, _cost_map_aggregated,
-               _width * _height * DISPARITY_MAX * sizeof(uint16_t), cudaMemcpyHostToDevice);
 
     t0 = cpu_time_get();
 
