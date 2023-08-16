@@ -35,6 +35,12 @@ int main(int argc, char **argv)
     cv::Mat left_image = cv::imread(left_image_path, cv::IMREAD_GRAYSCALE);
     cv::Mat right_image = cv::imread(right_image_path, cv::IMREAD_GRAYSCALE);
 
+    // 将图像的长宽对齐到32bit - 4byte
+    int new_img_rows = (left_image.rows + 3) / 4 * 4;
+    int new_img_cols = (left_image.cols + 3) / 4 * 4;
+    cv::resize(left_image, left_image, cv::Size(new_img_cols, new_img_rows));
+    cv::resize(right_image, right_image, cv::Size(new_img_cols, new_img_rows));
+
     sgm::SGM_CPU sgm(left_image.cols, left_image.rows, 10, 150);
 
     cv::Mat disparity = cv::Mat::zeros(left_image.rows, left_image.cols, CV_32FC1);
