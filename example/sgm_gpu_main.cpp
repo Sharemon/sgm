@@ -7,19 +7,8 @@
 
 #include <opencv2/opencv.hpp>
 #include <iostream>
-#include <sys/time.h>
-
 #include "./sgm_gpu/sgm_gpu.h"
 
-/// @brief 获取当前CPU时间
-/// @return 当前CPU时间
-inline double cpu_time_get()
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-
-    return (double)(tv.tv_sec + tv.tv_usec / 1000000.0);
-}
 
 int main(int argc, char **argv)
 {
@@ -38,8 +27,8 @@ int main(int argc, char **argv)
     cv::Mat right_image = cv::imread(right_image_path, cv::IMREAD_GRAYSCALE);
 
     // 将图像的长宽对齐到32bit - 4byte
-    int new_img_rows = (left_image.rows + 3) / 4 * 4;
-    int new_img_cols = (left_image.cols + 3) / 4 * 4;
+    int new_img_rows = 360;// = (left_image.rows + 3) / 4 * 4;
+    int new_img_cols = 640;// (left_image.cols + 3) / 4 * 4;
     cv::resize(left_image, left_image, cv::Size(new_img_cols, new_img_rows));
     cv::resize(right_image, right_image, cv::Size(new_img_cols, new_img_rows));
 
@@ -50,15 +39,17 @@ int main(int argc, char **argv)
     cv::Mat disparity = cv::Mat::zeros(left_image.rows, left_image.cols, CV_32FC1);
 
     // 计算视差图
-    double t0 = cpu_time_get();
+    auto t0 = std::chrono::high_resolution_clock().now();
     sgm.calculate_disparity(left_image.data, right_image.data, (float *)disparity.data);
-    double t1 = cpu_time_get();
-    std::cout << "sgm gpu time used " << t1 - t0 << "s" << std::endl;
+    auto t1 = std::chrono::high_resolution_clock().now();
+    std::cout << "sgm cpu time used " << std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() / 1000000.0 << "s" << std::endl;
 
     // 展示视差图
     cv::Mat disparity_show;
     disparity.convertTo(disparity_show, CV_8UC1, 4);
     cv::imwrite(disparity_save_path, disparity_show);
+    cv::imshow("result", disparity_show);
+    cv::waitKey(0);
 
     return 0;
 }

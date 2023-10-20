@@ -3,7 +3,7 @@ project(sgm CXX C CUDA)
 
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -fPIC")
-set(CMAKE_CUDA_ARCHITECTURES "61")
+set(CMAKE_CUDA_ARCHITECTURES "50")
 
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})

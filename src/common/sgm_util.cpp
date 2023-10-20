@@ -11,17 +11,7 @@
 #include <iostream>
 #include <string.h>
 #include <assert.h>
-#include <sys/time.h>
 
-/// @brief 获取当前系统时间
-/// @return 当前系统时间
-double sgm::cpu_time_get()
-{
-    struct timeval t;
-    gettimeofday(&t, NULL);
-
-    return ((double)t.tv_sec + t.tv_usec / 1000000.0);
-}
 
 /// @brief 计算图像坐标(x,y)上的census值
 /// @param img 图像输入
